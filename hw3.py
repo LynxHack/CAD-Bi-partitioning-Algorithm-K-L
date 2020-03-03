@@ -38,7 +38,6 @@ def parseFile(filename):
 
 ## Takes in a coordinate, color, and the existing canvas to draw a color in the grid
 def drawcell(i, j, color, c):
-    # print(sizex*i,sizey*j)
     c.create_rectangle(sizex*i,sizey*j,sizex*(i+1),sizey*(j+1), fill=color)
 
 ## Draw a line between two coordinates
@@ -59,6 +58,26 @@ def updategrid(grid, c):
             if colorid == 0 and value > len(COLORS):
                 colorid += 1
             drawcell(i, j, COLORS[colorid], c)
+
+def indexToCoord(grid, index):
+    return [index % len(grid), int(index / len(grid))]
+
+## draw final graphics from partition results
+def drawresults(grid, partition, c):
+    ## for partition 0, draw start from the first index in 2d grid, 
+    ## partition 1, draw starting from last index
+    part1ind = 0
+    part2ind = len(grid) * len(grid[0]) - 1
+    for key in partition:
+        coord = None
+        if partition[key] == 0:
+            coord = indexToCoord(grid, part1ind)
+        else:
+            coord = indexToCoord(grid, part2ind)
+        grid[coord[0]][coord[1]] = key
+
+    ## Draw out the final partitioning results
+    updategrid(grid, c)
 
 def cutsize(conn, partition):
     cutsize = 0
@@ -114,7 +133,7 @@ def parseConn(nets):
     return conn
 
 ## conn -> key and value list of connected blocks
-def KL(conn, numcells):
+def KL(grid, conn, numcells, c):
     ## initially assign half half to the two partitions
     counts = [0, 0] ## amount in first partition and second partition
     partition = {}
@@ -200,25 +219,26 @@ def KL(conn, numcells):
             print("Best Cutsize:", bestcutsize, "Best Min Cross:", bestmincross, "Curr Cutsize:", currcutsize)
 
             if currcutsize < bestcutsize:
-                bestState = copy.deepcopy(partition)
+                bestState = copy.copy(partition)
                 bestcutsize = currcutsize
             if currmincross < bestmincross:
-                bestcrossState = copy.deepcopy(partition)
+                bestcrossState = copy.copy(partition)
                 bestmincross = currmincross
                 mincross_cutsize = currcutsize
             ## Terminate K&L iteration as all are locked
             print("NumCells:", numcells, "NumLocked:", len(locked))
             if len(locked) == numcells:
                 break
-            print("Num Cross:", currmincross)
+            # print("Num Cross:", currmincross)
         print("Final cutsize:", mincross_cutsize, "Final min net crossings:", bestmincross)
+
+    ## Draw final location
+    drawresults(grid, partition, c)
+
 
 ## Main function
 if __name__== "__main__":
     filename = sys.argv[1]
-    graphicsEnabled =  True
-    if len(sys.argv) > 2:
-        graphicsEnabled = sys.argv[2]
 
     nets, numcells, numconn, numrows, numcols = parseFile("./ass2_files/"+filename+".txt")
     conn = parseConn(nets)
@@ -229,9 +249,8 @@ if __name__== "__main__":
     sizey = 500/numrows
     locations = [0] * (numcells)
 
-    # print(conn)
-
-    # set up white grids
+    # KL(conn, numcells)
+    # # set up white grids
     frame = Frame(root, width=1000, height=1000)
     frame.pack()
     c = Canvas(frame, bg='white', width=1000, height=1000)
@@ -239,14 +258,11 @@ if __name__== "__main__":
     c.pack()
 
     # Run algorithm in background via a thread
-    # updategrid(grid, c)
+    updategrid(grid, c)
 
-    thread = threading.Thread(target = KL, args = (conn, numcells))
+    thread = threading.Thread(target = KL, args = (grid, conn, numcells, c))
     thread.start()
 
-    # simAnneal(grid)
-    # print(locations)
-    # updategrid(grid, c)
     root.mainloop()
 
 
